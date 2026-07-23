@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/ap-terminal/',
+  base: process.env.NODE_ENV === 'production' ? '/ap-terminal/' : '/',
   server: {
     port: 5173,
     proxy: {
