@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ap-terminal-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ap-terminal-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: apterminal
+      POSTGRES_PASSWORD: apterminal
+      POSTGRES_DB: apterminal
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apterminal"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ap-terminal-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://apterminal:apterminal@postgres:5432/apterminal
+      REDIS_URL: redis://redis:6379/0
+      ENV: development
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
